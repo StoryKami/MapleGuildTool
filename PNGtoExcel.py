@@ -1,6 +1,7 @@
 import json
 import pandas as pd
 from collections import defaultdict
+from Char_class import character
 
 import cv2
 import requests
@@ -99,34 +100,81 @@ def kakao_ocr(image_path: str, appkey: str):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Please run with args: $ python example.py /path/to/image appkey")
-    image_path, appkey = sys.argv[1], sys.argv[2]
+    #if len(sys.argv) != 3:
+    #    print("Please run with args: $ python example.py /path/to/image appkey")
+    #image_path, appkey = sys.argv[1], sts,argv[2]
 
-    image_path = get_text_part(image_path)
+    #image_path = get_text_part(image_path)
+
+    appkey = "03f389b0dfea751af276e3caa1ed79aa"
 
     weekly_dict = {'닉네임': [None]*17, '직업': [None]*17, '레벨': [None]*17, '직위': [None]*17, '주간미션': [None]*17, '지하 수로': [None]*17, '플래그 레이스': [None]*17}
 
-    resize_impath = kakao_ocr_resize(image_path)
-    if resize_impath is not None:
-        image_path = resize_impath
-        print("원본 대신 리사이즈된 이미지를 사용합니다.")
+    member_lst = []
 
-    results = kakao_ocr(image_path, appkey).json()
-    results['result'].sort(key=lambda result: result['boxes'][0][0])
-    results = results['result']
+    for n in range(1, 13):
+        image_path = "./sample" + str(n) + ".png"
+        image_path = get_text_part(image_path)
+        resize_impath = kakao_ocr_resize(image_path)
+        if resize_impath is not None:
+            image_path = resize_impath
+            print("원본 대신 리사이즈된 이미지를 사용합니다.")
 
-    member_dict = defaultdict(list)
+        results = kakao_ocr(image_path, appkey).json()
+        results['result'].sort(key=lambda result: result['boxes'][0][0])
+        results = results['result']
 
-    for i, result in enumerate(results):
-        member_dict[result['boxes'][0][1] // 24].append((result['boxes'][0][0], ' '.join(result['recognition_words'])))
+        member_dict = defaultdict(list)
 
-    for lst in member_dict.values():
-        lst.sort()
+        for i, result in enumerate(results):
+            member_dict[result['boxes'][0][1] // 24].append((result['boxes'][0][0], ' '.join(result['recognition_words'])))
 
-    member_list = list(member_dict.items())
-    member_list.sort()
-    print(member_list)
+        for lst in member_dict.values():
+            lst.sort()
+
+        temp_lst = list(member_dict.items())
+        temp_lst.sort()
+        char_pnt_lst = []
+        for _, char in temp_lst:
+            nick = None
+            cls = None
+            lv = None
+            pos = None
+            week_pnt = None
+            boss_pnt = None
+            flag_pnt = None
+            for info in char:
+                if info[0] < 50:
+                    nick = info[1].replace(" ", "")
+                elif info[0] < 150:
+                    cls = info[1].replace(" ", "")
+                elif info[0] < 175:
+                    lv = info[1].replace(" ", "")
+                elif info[0] < 250:
+                    pos = info[1].replace(" ", "")
+                elif info[0] < 300:
+                    week_pnt = info[1].replace(" ", "")
+                elif info[0] < 375:
+                    boss_pnt = info[1].replace(" ", "")
+                else:
+                    flag_pnt = info[1].replace(" ", "")
+            ch = character(nick, cls, lv, pos)
+            pnt = (week_pnt, boss_pnt, flag_pnt)
+            char_pnt_lst.append((ch, pnt))
+
+        member_lst.extend(char_pnt_lst)
+        #print(member_list)
+    print(member_lst)
+
+    temp_lst = []
+    for char, pnt in member_lst:
+        tmp = char.to_lst()
+        tmp.extend(pnt)
+        temp_lst.append(tmp)
+    print(temp_lst)
+    df = pd.DataFrame(temp_lst, columns=['닉네임', '직업', '레벨', '직위', '주간포인트', '수로', '플래그'])
+    df.to_csv("weekly_pnt.csv", encoding="utf-8-sig")
+
     """
     for image_path in path_lst:
         resize_impath = kakao_ocr_resize(image_path)
