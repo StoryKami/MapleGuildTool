@@ -2,9 +2,13 @@ import json
 import pandas as pd
 from collections import defaultdict
 from Char_class import character
+from modify_OCR import *
 
 import cv2
 import requests
+import os
+from shutil import copy
+import shutil
 import sys
 
 LIMIT_PX = 1024
@@ -65,20 +69,18 @@ def get_text_part(image_path: str):
             else:
                 image[y, x] = (255, 255, 255)
 
-    img_path = "{}_text.jpg".format(image_path)
+    img_path = "{}_text.jpg".format(image_path[:-3])
     cv2.imwrite(img_path, image)
 
     return img_path
 
-    """
-    path_lst = []
-    for i in range(17):
-        img_path = "{}_text_{}.jpg".format(image_path, i)
-        cv2.imwrite(img_path, image[i * 24 : (i + 1) * 24, :])
-        path_lst.append(img_path)
+#    path_lst = []
+#    for i in range(17):
+#        img_path = "{}_text_{}.jpg".format(image_path, i)
+#        cv2.imwrite(img_path, image[i * 24 : (i + 1) * 24, :])
+#        path_lst.append(img_path)
+#    return path_lst
 
-    return path_lst
-    """
 
 
 def kakao_ocr(image_path: str, appkey: str):
@@ -112,15 +114,22 @@ def main():
 
     member_lst = []
 
-    for n in range(1, 13):
-        image_path = "./sample" + str(n) + ".png"
-        image_path = get_text_part(image_path)
+    path_dir = './capture'
+    file_lst = os.listdir(path_dir)
+
+    for i, image_name in enumerate(file_lst):
+        image_path = os.path.join(path_dir, image_name)
+        new_img_path = os.path.join(path_dir, 'sample' + str(i) + 'png')
+        copy(image_path, new_img_path)
+        image_path = get_text_part(new_img_path)
         resize_impath = kakao_ocr_resize(image_path)
         if resize_impath is not None:
             image_path = resize_impath
             print("원본 대신 리사이즈된 이미지를 사용합니다.")
 
         results = kakao_ocr(image_path, appkey).json()
+        os.unlink(image_path)
+        os.unlink(new_img_path)
         results['result'].sort(key=lambda result: result['boxes'][0][0])
         results = results['result']
 
@@ -136,28 +145,43 @@ def main():
         temp_lst.sort()
         char_pnt_lst = []
         for _, char in temp_lst:
-            nick = None
-            cls = None
-            lv = None
-            pos = None
-            week_pnt = None
-            boss_pnt = None
-            flag_pnt = None
+            nick = ''
+            cls = ''
+            lv = ''
+            pos = ''
+            week_pnt = ''
+            boss_pnt = ''
+            flag_pnt = ''
             for info in char:
                 if info[0] < 50:
-                    nick = info[1].replace(" ", "")
+                    nick += info[1].replace(" ", "")
                 elif info[0] < 150:
-                    cls = info[1].replace(" ", "")
+                    cls += info[1].replace(" ", "")
                 elif info[0] < 175:
-                    lv = info[1].replace(" ", "")
+                    lv += info[1].replace(" ", "")
                 elif info[0] < 250:
-                    pos = info[1].replace(" ", "")
+                    pos += info[1].replace(" ", "")
                 elif info[0] < 300:
-                    week_pnt = info[1].replace(" ", "")
+                    week_pnt += info[1].replace(" ", "")
                 elif info[0] < 375:
-                    boss_pnt = info[1].replace(" ", "")
+                    boss_pnt += info[1].replace(" ", "")
                 else:
-                    flag_pnt = info[1].replace(" ", "")
+                    flag_pnt += info[1].replace(" ", "")
+            if len(nick) > 6 and cls == '':
+                cls = nick[6:]
+                nick = nick[:6]
+            if lv == '':
+                lv = cls[-3:]
+                cls = cls[:-3]
+            cls.strip(',')
+
+            pos = modify_pos(pos)
+            lv = modify_lv(lv)
+            week_pnt = modify_weekly_pnt(week_pnt)
+            boss_pnt = modify_boss_pnt(boss_pnt)
+            flag_pnt = modify_flag_pnt(flag_pnt)
+            week_pnt, boss_pnt, flag_pnt = validation(week_pnt, boss_pnt, flag_pnt)
+
             ch = character(nick, cls, lv, pos)
             pnt = (week_pnt, boss_pnt, flag_pnt)
             char_pnt_lst.append((ch, pnt))
@@ -173,7 +197,7 @@ def main():
         temp_lst.append(tmp)
     print(temp_lst)
     df = pd.DataFrame(temp_lst, columns=['닉네임', '직업', '레벨', '직위', '주간포인트', '수로', '플래그'])
-    df.to_csv("weekly_pnt.csv", encoding="utf-8-sig")
+    df.to_csv("weekly_pnt_mod.csv", encoding="utf-8-sig")
 
     """
     for image_path in path_lst:

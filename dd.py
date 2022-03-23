@@ -1,0 +1,1 @@
+f = open("temp.txt", 'r')

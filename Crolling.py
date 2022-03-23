@@ -35,9 +35,17 @@ def get_members_one_page(link, page):
 
     return df
 
+def main():
+    df = get_members_all_page()
+    df.reset_index(inplace=True)
+    df = df[['닉네임', '직업', '레벨', '직위']]
+    print(df)
+    df.to_csv("guild_member.csv", encoding="utf-8-sig")
+    df = pd.read_csv("guild_member.csv")
+    df = df[['닉네임', '직업', '레벨', '직위']]
+    df.sort_values(by=['닉네임'], axis=0, inplace=True)
+    df.reset_index(inplace=True, drop=True)
+    df.to_csv("sorted_guild_member.csv", encoding="utf-8-sig")
 
-df = get_members_all_page()
-df.reset_index(inplace=True)
-df = df[['닉네임', '직업', '레벨', '직위']]
-print(df)
-df.to_csv("guild_member.csv", encoding="utf-8-sig")
+if __name__ == "__main__":
+    main()
